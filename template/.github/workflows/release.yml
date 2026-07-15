@@ -1,0 +1,48 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_call:
+    inputs:
+      tag:
+        description: Tag to publish
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to publish
+        required: true
+        type: string
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+      REPOSITORY_NAME: ${{ github.event.repository.name }}
+    steps:
+      - name: Create GitHub release
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[1-9][0-9]*)?$ ]] || {
+            echo "Invalid release tag: $RELEASE_TAG"
+            exit 1
+          }
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists."
+            exit 0
+          fi
+
+          args=(release create "$RELEASE_TAG" --verify-tag --generate-notes --title "$REPOSITORY_NAME $RELEASE_TAG")
+          [[ "$RELEASE_TAG" =~ -rc\.[1-9][0-9]*$ ]] && args+=(--prerelease)
+          if ! gh "${args[@]}"; then
+            gh release view "$RELEASE_TAG" >/dev/null 2>&1 || exit 1
+            echo "Release $RELEASE_TAG exists after an ambiguous create failure."
+          fi

@@ -1,0 +1,78 @@
+name: Release Dispatch
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: Release command
+        required: true
+        type: choice
+        options:
+          - init
+          - patch
+          - rc:minor
+          - rc:major
+          - rc
+          - rc:promote
+      confirm_init:
+        description: Required for init; type yes
+        required: false
+        type: string
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    concurrency:
+      group: release-dispatch-${{ github.ref_name }}
+      cancel-in-progress: false
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref_name }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Guard branch
+        env:
+          RELEASE_TYPE: ${{ inputs.release_type }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          case "$RELEASE_TYPE" in
+            rc|rc:promote)
+              [[ "$BRANCH" =~ ^rc/v[0-9]+\.[0-9]+\.[0-9]+-rc\.1$ ]] || {
+                echo "${RELEASE_TYPE} must run on rc/vX.Y.Z-rc.1."
+                exit 1
+              }
+              ;;
+            init|patch|rc:minor|rc:major)
+              [ "$BRANCH" = main ] || {
+                echo "${RELEASE_TYPE} must run on main."
+                exit 1
+              }
+              ;;
+          esac
+
+      - name: Run release script
+        id: release
+        env:
+          CONFIRM_INIT: ${{ inputs.confirm_init }}
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/release.sh "${{ inputs.release_type }}"
+
+  publish:
+    needs: release
+    if: needs.release.outputs.tag != ''
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.release.outputs.tag }}
+    permissions:
+      contents: write
