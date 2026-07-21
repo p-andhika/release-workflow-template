@@ -9,21 +9,23 @@ single self-contained page (no build, no dependencies) that plays through both f
 the git commands (terminal), the branch/merge diagram, and a traveling callout that narrates each
 step.
 
-![Release workflow walkthrough](release-workflow.gif)
+**▶ [Play the interactive walkthrough](https://raw.githack.com/p-andhika/release-workflow-template/main/release-workflow.html)** — or click the preview below.
+
+[![Release workflow walkthrough](release-workflow.gif)](https://raw.githack.com/p-andhika/release-workflow-template/main/release-workflow.html)
 
 > A README can't run the page's JavaScript (GitHub strips `<script>`), so the GIF above is just a
-> preview. To **play the interactive version**:
+> preview. Ways to play the real, interactive version:
 >
+> - **Hosted (click to play)** — served with the correct content type by githack:
+>   <https://raw.githack.com/p-andhika/release-workflow-template/main/release-workflow.html>
 > - **Locally** — open the file in any browser:
 >   ```bash
 >   open release-workflow.html            # macOS
 >   # xdg-open release-workflow.html      # Linux
 >   # start release-workflow.html         # Windows
 >   ```
-> - **Hosted, zero setup** — once this repo is on GitHub, the live page is available through githack:
->   `https://raw.githack.com/<OWNER>/<REPO>/main/release-workflow.html`
-> - **GitHub Pages** — Settings → Pages → deploy from `main` (root); it is then served at
->   `https://<OWNER>.github.io/<REPO>/release-workflow.html`
+> - **GitHub Pages** (optional) — Settings → Pages → deploy from `main` (root); then served at
+>   `https://p-andhika.github.io/release-workflow-template/release-workflow.html`
 >
 > Controls: `space` = play/pause · `←` / `→` = step · tabs switch **Normal release / Hotfix**.
 > `release-workflow.mp4` is also included for pasting into issues, PRs, or Slack.
