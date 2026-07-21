@@ -26,8 +26,13 @@ All commands require a clean worktree. Commands run on `main` also require local
 2. Test the pushed RC tag. Merge fixes into the same `rc/vX.Y.Z-rc.1` branch.
 3. Run `release:rc` for each new candidate. Branch stays `.1`; package version and tag advance.
 4. From the tested RC branch, run `release:rc:promote`.
-5. Merge the generated `release/vX.Y.Z` PR into `main`. Automation then pushes `vX.Y.Z` and publishes the GitHub release.
+5. Merge the generated `release/vX.Y.Z` PR into `main`. Automation then pushes `vX.Y.Z`, publishes the GitHub release, and deletes the now-obsolete `rc/vX.Y.Z-rc.1` branch (the RC history is preserved in the `-rc.N` tags).
 
 `release:patch` follows the same PR-and-post-merge-tag path without an RC train. `init` is the sole direct stable tag command and refuses to run once any `v*` tag exists.
 
-If tag creation succeeds but GitHub Release publication fails, rerun `.github/workflows/release.yml` manually with that existing tag. Publication is idempotent: an existing matching GitHub Release is treated as success.
+After a tag is created, `.github/workflows/release.yml` runs two jobs:
+
+1. `prepare-release-notes` calculates the previous release-class tag, categorizes `feat`, `fix`, `refactor`, and `perf` commits, updates `CHANGELOG.md` on `main`, and pushes the changelog commit.
+2. `release` calls GitHub's `generateReleaseNotes` API with the previous tag and uses that generated body for the GitHub Release. RC tags are published as prereleases.
+
+If tag creation succeeds but publication fails, rerun `.github/workflows/release.yml` manually with the existing tag. The publication step is idempotent and treats an existing matching GitHub Release as success.

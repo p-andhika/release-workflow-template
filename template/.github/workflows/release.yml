@@ -18,8 +18,95 @@ on:
         type: string
 
 jobs:
+  prepare-release-notes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      previous_tag: ${{ steps.tags.outputs.previous_tag }}
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+      STABLE_BRANCH: main
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Determine previous tag
+        id: tags
+        run: |
+          TAG="$RELEASE_TAG"
+          if [[ "$TAG" =~ -rc\.[1-9][0-9]*$ ]]; then
+            FILTER='^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[1-9][0-9]*)?$'
+          else
+            FILTER='^v[0-9]+\.[0-9]+\.[0-9]+$'
+          fi
+
+          PREVIOUS_TAG="$(git tag --list 'v*' --sort=-v:refname | grep -E "$FILTER" | awk -v tag="$TAG" '$0 == tag {found=1; next} found {print; exit}' || true)"
+          echo "previous_tag=${PREVIOUS_TAG}" >>"$GITHUB_OUTPUT"
+          echo "Previous tag: ${PREVIOUS_TAG:-none}"
+
+      - name: Prepare CHANGELOG.md
+        env:
+          PREVIOUS_TAG: ${{ steps.tags.outputs.previous_tag }}
+        run: |
+          TAG="$RELEASE_TAG"
+          VERSION="${TAG#v}"
+          git fetch origin "$STABLE_BRANCH"
+          git checkout -B "changelog-update-${VERSION}" "origin/${STABLE_BRANCH}"
+
+          if grep -q "^## \[${VERSION}\]" CHANGELOG.md 2>/dev/null; then
+            echo "CHANGELOG.md already contains ${VERSION}; no update needed."
+            exit 0
+          fi
+
+          if [ ! -f CHANGELOG.md ]; then
+            printf '# Changelog\n\n' >CHANGELOG.md
+          fi
+
+          if [ -n "$PREVIOUS_TAG" ]; then
+            RANGE="${PREVIOUS_TAG}..${TAG}"
+          else
+            RANGE="$(git rev-list --max-parents=0 "$TAG")..${TAG}"
+          fi
+
+          FEATS="$(git log "$RANGE" --format='- %s' --grep='^feat' || true)"
+          FIXES="$(git log "$RANGE" --format='- %s' --grep='^fix' || true)"
+          OTHERS="$(git log "$RANGE" --format='- %s' --grep='^refactor\|^perf' || true)"
+          REPO_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+          TMPFILE="$(mktemp)"
+          {
+            printf '## [%s] - %s\n' "$VERSION" "$(date -u +%Y-%m-%d)"
+            if [ -n "$FEATS" ]; then printf '\n### Added\n\n%s\n' "$FEATS"; fi
+            if [ -n "$FIXES" ]; then printf '\n### Fixed\n\n%s\n' "$FIXES"; fi
+            if [ -n "$OTHERS" ]; then printf '\n### Changed\n\n%s\n' "$OTHERS"; fi
+            if [ -n "$PREVIOUS_TAG" ]; then
+              printf '\n**Full Changelog**: %s/compare/%s...%s\n' "$REPO_URL" "$PREVIOUS_TAG" "$TAG"
+            else
+              printf '\n**Full Changelog**: %s/commits/%s\n' "$REPO_URL" "$TAG"
+            fi
+          } >"$TMPFILE"
+
+          { head -n 3 CHANGELOG.md; cat "$TMPFILE"; tail -n +4 CHANGELOG.md; } >CHANGELOG.new.md
+          mv CHANGELOG.new.md CHANGELOG.md
+          rm -f "$TMPFILE"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git diff --cached --quiet && {
+            echo "No CHANGELOG.md changes generated."
+            exit 0
+          }
+          git commit -m "docs: update CHANGELOG.md for ${TAG}"
+          git push origin "HEAD:${STABLE_BRANCH}"
+
   release:
     runs-on: ubuntu-latest
+    needs: prepare-release-notes
     permissions:
       contents: write
     env:
@@ -27,22 +114,50 @@ jobs:
       GH_REPO: ${{ github.repository }}
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
       REPOSITORY_NAME: ${{ github.event.repository.name }}
+      PREVIOUS_TAG: ${{ needs.prepare-release-notes.outputs.previous_tag }}
     steps:
+      - name: Checkout release tag
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Generate GitHub release notes
+        id: release_notes
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          TAG: ${{ env.RELEASE_TAG }}
+          PREVIOUS_TAG: ${{ env.PREVIOUS_TAG }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const params = {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: process.env.TAG,
+            };
+            if (process.env.PREVIOUS_TAG) {
+              params.previous_tag_name = process.env.PREVIOUS_TAG;
+            }
+            const { data } = await github.rest.repos.generateReleaseNotes(params);
+            core.setOutput('body', data.body);
+
       - name: Create GitHub release
+        env:
+          RELEASE_NOTES: ${{ steps.release_notes.outputs.body }}
         run: |
           [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[1-9][0-9]*)?$ ]] || {
             echo "Invalid release tag: $RELEASE_TAG"
             exit 1
           }
-
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             echo "Release $RELEASE_TAG already exists."
             exit 0
           fi
-
-          args=(release create "$RELEASE_TAG" --verify-tag --generate-notes --title "$REPOSITORY_NAME $RELEASE_TAG")
-          [[ "$RELEASE_TAG" =~ -rc\.[1-9][0-9]*$ ]] && args+=(--prerelease)
-          if ! gh "${args[@]}"; then
+          gh_args=(release create "$RELEASE_TAG" --verify-tag --title "$REPOSITORY_NAME $RELEASE_TAG" --notes "$RELEASE_NOTES")
+          [[ "$RELEASE_TAG" =~ -rc\.[1-9][0-9]*$ ]] && gh_args+=(--prerelease)
+          if ! gh "${gh_args[@]}"; then
             gh release view "$RELEASE_TAG" >/dev/null 2>&1 || exit 1
-            echo "Release $RELEASE_TAG exists after an ambiguous create failure."
+            echo "Release exists after an ambiguous create failure."
           fi

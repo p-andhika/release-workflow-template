@@ -33,11 +33,11 @@ exit 2
 EOF
 chmod +x "$TMP/bin/gh"
 
-PATH="$TMP/bin:$PATH" GH_STUB_STATE="$TMP/existing" RELEASE_TAG=v1.2.3 REPOSITORY_NAME=fixture bash -c ': >"$GH_STUB_STATE"; exec "$1"' _ "$TMP/publish.sh" >"$TMP/existing.log"
+PATH="$TMP/bin:$PATH" GH_STUB_STATE="$TMP/existing" RELEASE_TAG=v1.2.3 RELEASE_NAME=fixture RELEASE_NOTES='' REPOSITORY_NAME=fixture bash -c ': >"$GH_STUB_STATE"; exec "$1"' _ "$TMP/publish.sh" >"$TMP/existing.log"
 grep -Fq 'already exists' "$TMP/existing.log"
 echo 'ok 1 - existing GitHub release is idempotent'
 
-PATH="$TMP/bin:$PATH" GH_STUB_STATE="$TMP/ambiguous" GH_STUB_AMBIGUOUS=true RELEASE_TAG=v1.2.4-rc.1 REPOSITORY_NAME=fixture "$TMP/publish.sh" >"$TMP/ambiguous.log"
+PATH="$TMP/bin:$PATH" GH_STUB_STATE="$TMP/ambiguous" GH_STUB_AMBIGUOUS=true RELEASE_TAG=v1.2.4-rc.1 RELEASE_NOTES='' REPOSITORY_NAME=fixture "$TMP/publish.sh" >"$TMP/ambiguous.log"
 grep -Fq 'ambiguous create failure' "$TMP/ambiguous.log"
 echo 'ok 2 - ambiguous release creation succeeds after remote confirmation'
 

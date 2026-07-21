@@ -23,7 +23,12 @@ fi
 
 grep -Fq 'rc/vX.Y.Z-rc.1' "$TEMPLATE/README.release.md"
 grep -Fq 'uses: ./.github/workflows/release.yml' "$TEMPLATE/.github/workflows/release-dispatch.yml"
+grep -Fq 'Delete RC branch' "$TEMPLATE/.github/workflows/release-tag-after-merge.yml"
 grep -Fq 'github.event.repository.name' "$TEMPLATE/.github/workflows/release.yml"
+grep -Fq 'uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7' "$TEMPLATE/.github/workflows/release.yml"
+
+grep -Fq 'generateReleaseNotes' "$TEMPLATE/.github/workflows/release.yml"
+grep -Fq 'CHANGELOG.md' "$TEMPLATE/.github/workflows/release.yml"
 
 for test in "$ROOT"/tests/test-*.sh; do
   bash "$test"

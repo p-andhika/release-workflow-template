@@ -1,0 +1,1829 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Release Workflow — terminal walkthrough</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --paper: oklch(0.975 0.01 92);
+        --paper-2: oklch(0.955 0.014 92);
+        --ink: oklch(0.255 0.035 264);
+        --ink-2: oklch(0.44 0.03 264);
+        --ink-3: oklch(0.6 0.02 264);
+        --hair: oklch(0.255 0.035 264 / 0.14);
+        --main: oklch(0.34 0.045 264);
+        --rc: oklch(0.7 0.155 58);
+        --rel: oklch(0.56 0.115 162);
+        --feat: oklch(0.55 0.15 268);
+        --hot: oklch(0.55 0.21 12);
+        --tag: oklch(0.56 0.185 24);
+        --term-bg: oklch(0.235 0.028 264);
+        --term-bg2: oklch(0.285 0.03 264);
+        --term-fg: oklch(0.9 0.015 92);
+        --term-dim: oklch(0.66 0.02 264);
+        --term-ok: oklch(0.8 0.13 162);
+        --term-amber: oklch(0.8 0.13 65);
+        --disp: "Bricolage Grotesque", "Georgia", serif;
+        --sans: "Instrument Sans", system-ui, sans-serif;
+        --mono: "JetBrains Mono", ui-monospace, monospace;
+        --ease: cubic-bezier(0.22, 0.61, 0.18, 1);
+        --dur: 0.6s;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+      }
+      body {
+        background:
+          radial-gradient(
+            120% 80% at 10% -10%,
+            var(--paper-2),
+            transparent 55%
+          ),
+          var(--paper);
+        color: var(--ink);
+        font-family: var(--sans);
+        -webkit-font-smoothing: antialiased;
+        line-height: 1.5;
+        height: 100vh;
+        height: 100dvh;
+        overflow: hidden;
+        display: flex;
+        padding: clamp(12px, 2vw, 26px);
+      }
+      .wrap {
+        max-width: 1280px;
+        margin: 0 auto;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: clamp(10px, 1.5vh, 16px);
+      }
+
+      header.top {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 24px;
+        flex-wrap: wrap;
+        flex: 0 0 auto;
+      }
+      .brand .kicker {
+        font: 600 12px/1 var(--sans);
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: var(--rc);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 9px;
+      }
+      .brand .kicker::before {
+        content: "";
+        width: 24px;
+        height: 2px;
+        background: var(--rc);
+      }
+      h1 {
+        font-family: var(--disp);
+        font-weight: 800;
+        font-size: clamp(23px, 3.1vw, 38px);
+        line-height: 0.98;
+        letter-spacing: -0.02em;
+        margin: 0;
+      }
+      h1 em {
+        font-style: normal;
+        color: var(--rc);
+      }
+      .brand p {
+        margin: 7px 0 0;
+        color: var(--ink-2);
+        font-size: 13.5px;
+        max-width: 52ch;
+      }
+      .brand p code {
+        font-family: var(--mono);
+        font-size: 0.88em;
+        color: var(--ink);
+      }
+
+      .side {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 12px;
+      }
+      .tabs {
+        display: inline-flex;
+        background: var(--paper-2);
+        border: 1px solid var(--hair);
+        border-radius: 12px;
+        padding: 4px;
+        gap: 4px;
+      }
+      .tab {
+        appearance: none;
+        border: 0;
+        background: transparent;
+        cursor: pointer;
+        font: 700 13px/1 var(--sans);
+        color: var(--ink-3);
+        padding: 9px 16px;
+        border-radius: 9px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition:
+          color 0.2s,
+          background 0.2s;
+      }
+      .tab .d {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: red;
+        opacity: 0.55;
+      }
+      .tab.on {
+        background: var(--ink);
+        color: var(--paper);
+      }
+      .tab[data-flow="hotfix"].on {
+        background: var(--hot);
+      }
+      .tab[data-flow="normal"] .d {
+        color: var(--rc);
+      }
+      .tab[data-flow="hotfix"] .d {
+        color: var(--hot);
+      }
+      .stepper {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .stepper .sd {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: var(--hair);
+        transition:
+          background 0.3s var(--ease),
+          transform 0.3s var(--ease);
+      }
+      .stepper .sd.done {
+        background: color-mix(in oklch, var(--rc) 55%, var(--paper));
+      }
+      .stepper .sd.cur {
+        background: var(--rc);
+        transform: scale(1.5);
+      }
+
+      .app {
+        border: 1px solid var(--hair);
+        border-radius: 16px;
+        overflow: hidden;
+        background: var(--paper-2);
+        box-shadow: 0 24px 60px -40px oklch(0.25 0.04 264 / 0.5);
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .titlebar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 16px;
+        border-bottom: 1px solid var(--hair);
+        background: var(--paper);
+        flex: 0 0 auto;
+      }
+      .lights {
+        display: flex;
+        gap: 7px;
+      }
+      .lights i {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        display: block;
+      }
+      .lights i:nth-child(1) {
+        background: oklch(0.72 0.17 25);
+      }
+      .lights i:nth-child(2) {
+        background: oklch(0.83 0.13 85);
+      }
+      .lights i:nth-child(3) {
+        background: oklch(0.78 0.13 150);
+      }
+      .titlebar .name {
+        font: 600 13px/1 var(--sans);
+        color: var(--ink-2);
+      }
+      .titlebar .ctx {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .ctx .on {
+        color: var(--ink-3);
+        font-weight: 500;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        font-size: 10px;
+      }
+      .chip {
+        padding: 5px 10px;
+        border-radius: 999px;
+        font: 700 12px/1 var(--mono);
+      }
+      .chip.main {
+        color: var(--paper);
+        background: var(--main);
+      }
+      .chip.rc {
+        color: oklch(0.36 0.1 60);
+        background: color-mix(in oklch, var(--rc) 34%, var(--paper));
+      }
+      .chip.rel {
+        color: oklch(0.32 0.09 162);
+        background: color-mix(in oklch, var(--rel) 30%, var(--paper));
+      }
+
+      .panes {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        flex: 1 1 auto;
+        min-height: 0;
+      }
+
+      .term {
+        background: linear-gradient(180deg, var(--term-bg2), var(--term-bg));
+        color: var(--term-fg);
+        padding: 16px 20px;
+        font-family: var(--mono);
+        font-size: 13px;
+        line-height: 1.68;
+        border-right: 1px solid var(--hair);
+        overflow: hidden;
+        min-height: 0;
+      }
+      .term .cwd {
+        color: var(--term-dim);
+        font-size: 11.5px;
+        letter-spacing: 0.02em;
+        margin-bottom: 10px;
+        opacity: 0.9;
+      }
+      .tline {
+        white-space: pre-wrap;
+        word-break: break-word;
+        opacity: 0;
+        transform: translateY(4px);
+        animation: lineIn 0.34s var(--ease) forwards;
+        animation-delay: calc(var(--i) * 85ms);
+      }
+      @keyframes lineIn {
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      .tline .p {
+        color: var(--term-amber);
+        margin-right: 2px;
+      }
+      .tline.cmd {
+        color: #fff;
+        font-weight: 700;
+      }
+      .tline.out {
+        color: var(--term-fg);
+      }
+      .tline.mut {
+        color: var(--term-dim);
+      }
+      .tline.ok {
+        color: var(--term-ok);
+      }
+      .tline.warn {
+        color: var(--term-amber);
+      }
+      .tline b {
+        color: #fff;
+        font-weight: 700;
+      }
+      .caret {
+        display: inline-block;
+        width: 8px;
+        height: 15px;
+        background: var(--term-amber);
+        vertical-align: -2px;
+        margin-left: 3px;
+        animation: blink 1s steps(1) infinite;
+      }
+      @keyframes blink {
+        50% {
+          opacity: 0;
+        }
+      }
+
+      .graph {
+        background: var(--paper-2);
+        position: relative;
+        min-height: 0;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+      .glabel {
+        flex: 0 0 auto;
+        font: 700 11px/1 var(--mono);
+        letter-spacing: 0.08em;
+        color: var(--ink-3);
+        text-transform: uppercase;
+        padding: 12px 18px 4px;
+      }
+      .swim {
+        flex: 1 1 auto;
+        min-height: 120px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 4px 16px 6px;
+      }
+      svg.pipe {
+        width: 100%;
+        height: auto;
+        max-height: 100%;
+        display: none;
+      }
+      svg.pipe.on {
+        display: block;
+      }
+
+      .detail {
+        flex: 0 0 auto;
+        max-height: 42%;
+        overflow: auto;
+        padding: 2px 20px 14px;
+        border-top: 1px solid var(--hair);
+      }
+      .dlabel {
+        font: 700 10.5px/1 var(--mono);
+        letter-spacing: 0.08em;
+        color: var(--ink-3);
+        text-transform: uppercase;
+        padding: 11px 0 9px;
+        position: sticky;
+        top: 0;
+        background: var(--paper-2);
+      }
+      .detail ol {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        counter-reset: d;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .detail li {
+        counter-increment: d;
+        position: relative;
+        padding: 3px 8px 3px 38px;
+        margin-left: -8px;
+        border-radius: 8px;
+        font: 500 13px/1.42 var(--sans);
+        color: var(--ink-3);
+        opacity: 0.32;
+        transform: translateY(4px);
+        transition:
+          opacity 0.35s var(--ease),
+          transform 0.35s var(--ease),
+          color 0.3s var(--ease),
+          background 0.3s var(--ease);
+      }
+      .detail li.show {
+        opacity: 1;
+        transform: none;
+        color: var(--ink-2);
+      }
+      .detail li.active {
+        background: color-mix(in oklch, var(--ink) 5%, var(--paper));
+        color: var(--ink);
+      }
+      .detail li::before {
+        content: counter(d);
+        position: absolute;
+        left: 8px;
+        top: 2px;
+        width: 22px;
+        height: 22px;
+        border-radius: 7px;
+        background: var(--paper);
+        border: 1px solid var(--hair);
+        font: 700 11px/22px var(--mono);
+        text-align: center;
+        color: var(--ink-3);
+        transition:
+          background 0.3s var(--ease),
+          color 0.3s var(--ease),
+          border-color 0.3s var(--ease),
+          transform 0.3s var(--ease);
+      }
+      .detail li.active::before {
+        background: var(--ink);
+        border-color: var(--ink);
+        color: var(--paper);
+        transform: scale(1.08);
+      }
+      .detail li.done::before {
+        background: color-mix(in oklch, var(--ink) 14%, var(--paper));
+        border-color: transparent;
+        color: var(--ink-2);
+      }
+      .detail li code {
+        font-family: var(--mono);
+        font-size: 0.88em;
+        color: var(--ink);
+        background: var(--paper);
+        border: 1px solid var(--hair);
+        padding: 0 4px;
+        border-radius: 4px;
+      }
+      .detail li b {
+        color: var(--ink);
+        font-weight: 600;
+      }
+
+      .band {
+        transition: opacity 0.4s var(--ease);
+      }
+      .band.feat rect {
+        fill: color-mix(in oklch, var(--feat) 11%, var(--paper));
+      }
+      .band.rc rect {
+        fill: color-mix(in oklch, var(--rc) 13%, var(--paper));
+      }
+      .band.rel rect {
+        fill: color-mix(in oklch, var(--rel) 12%, var(--paper));
+      }
+      .band.main rect {
+        fill: color-mix(in oklch, var(--main) 9%, var(--paper));
+      }
+      .band.hot rect {
+        fill: color-mix(in oklch, var(--hot) 11%, var(--paper));
+      }
+      .lane-label {
+        font: 700 17px/1 var(--mono);
+      }
+      .lane-label.feat {
+        fill: oklch(0.48 0.14 268);
+      }
+      .lane-label.rc {
+        fill: oklch(0.5 0.13 58);
+      }
+      .lane-label.rel {
+        fill: oklch(0.42 0.1 162);
+      }
+      .lane-label.main {
+        fill: var(--main);
+      }
+      .lane-label.hot {
+        fill: oklch(0.5 0.19 12);
+      }
+      .band.rc.gone {
+        opacity: 0.3;
+      }
+      .band.feat.gone {
+        opacity: 0.3;
+      }
+
+      .edge {
+        fill: none;
+        stroke-width: 4;
+        stroke-linecap: round;
+        stroke-dasharray: 1;
+        stroke-dashoffset: 1;
+        transition: stroke-dashoffset var(--dur) var(--ease);
+      }
+      .edge.show {
+        stroke-dashoffset: 0;
+      }
+      .edge.main {
+        stroke: var(--main);
+      }
+      .edge.rc {
+        stroke: var(--rc);
+      }
+      .edge.rel {
+        stroke: var(--rel);
+      }
+      .edge.feat {
+        stroke: var(--feat);
+      }
+      .edge.hot {
+        stroke: var(--hot);
+      }
+      .edge.gone {
+        opacity: 0.28;
+      }
+
+      .node {
+        opacity: 0;
+        transition: opacity 0.4s var(--ease);
+      }
+      .node.show {
+        opacity: 1;
+      }
+      .node circle {
+        fill: var(--paper);
+        stroke-width: 4;
+      }
+      .node.main circle {
+        stroke: var(--main);
+      }
+      .node.rc circle {
+        stroke: var(--rc);
+      }
+      .node.rel circle {
+        stroke: var(--rel);
+      }
+      .node.feat circle {
+        stroke: var(--feat);
+      }
+      .node.hot circle {
+        stroke: var(--hot);
+      }
+      .node.gone {
+        opacity: 0.35;
+      }
+      .tagpill rect {
+        fill: var(--tag);
+      }
+      .tagpill text {
+        fill: var(--paper);
+        font: 700 14px/1 var(--mono);
+      }
+      .refbox rect {
+        fill: color-mix(in oklch, var(--main) 10%, var(--paper));
+        stroke: var(--main);
+        stroke-width: 1.3;
+      }
+      .refbox text {
+        font: 700 14px/1 var(--mono);
+        fill: var(--main);
+      }
+      .refbox.rc rect {
+        fill: color-mix(in oklch, var(--rc) 16%, var(--paper));
+        stroke: var(--rc);
+      }
+      .refbox.rc text {
+        fill: oklch(0.44 0.11 60);
+      }
+      .refbox.rel rect {
+        fill: color-mix(in oklch, var(--rel) 14%, var(--paper));
+        stroke: var(--rel);
+      }
+      .refbox.rel text {
+        fill: oklch(0.34 0.09 162);
+      }
+      .refbox.feat rect {
+        fill: color-mix(in oklch, var(--feat) 14%, var(--paper));
+        stroke: var(--feat);
+      }
+      .refbox.feat text {
+        fill: oklch(0.44 0.15 268);
+      }
+      .refbox.hot rect {
+        fill: color-mix(in oklch, var(--hot) 14%, var(--paper));
+        stroke: var(--hot);
+      }
+      .refbox.hot text {
+        fill: oklch(0.47 0.19 12);
+      }
+      .node.gone .refbox.rc text {
+        text-decoration: line-through;
+      }
+
+      .rcdel {
+        opacity: 0;
+        transition: opacity 0.5s var(--ease);
+      }
+      .rcdel.show {
+        opacity: 1;
+      }
+      .rcdel .strike {
+        stroke: var(--hot);
+        stroke-width: 4;
+        stroke-linecap: round;
+      }
+      .rcdel .delpill rect {
+        fill: var(--hot);
+      }
+      .rcdel .delpill text {
+        fill: var(--paper);
+        font: 800 13px/1 var(--mono);
+        text-anchor: middle;
+      }
+
+      #tok,
+      .tok {
+        transition: transform var(--dur) var(--ease);
+      }
+      .tok .ring {
+        fill: none;
+        stroke: var(--ink);
+        stroke-width: 3;
+        opacity: 0.85;
+      }
+      .tok .core {
+        fill: var(--ink);
+      }
+      .tok .pulse {
+        fill: none;
+        stroke: var(--ink);
+        stroke-width: 2.5;
+        transform-origin: center;
+        animation: pulse 1.8s var(--ease) infinite;
+      }
+      @keyframes pulse {
+        0% {
+          r: 13;
+          opacity: 0.5;
+        }
+        70%,
+        100% {
+          r: 26;
+          opacity: 0;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .tok .pulse {
+          animation: none;
+          opacity: 0;
+        }
+      }
+
+      /* traveling callout that rides to the active commit */
+      .callout {
+        transition:
+          transform 0.55s var(--ease),
+          opacity 0.35s var(--ease);
+      }
+      .callout.hide {
+        opacity: 0;
+      }
+      .ctail {
+        stroke: var(--ink-3);
+        stroke-width: 2;
+        stroke-dasharray: 3 3;
+        fill: none;
+        opacity: 0.7;
+      }
+      .cbox {
+        fill: var(--ink);
+      }
+      .cbadge {
+        fill: var(--rc);
+      }
+      .pipe[data-flow="hotfix"] .cbadge {
+        fill: var(--hot);
+      }
+      .cnum {
+        fill: var(--paper);
+        font: 800 14px/1 var(--mono);
+        text-anchor: middle;
+      }
+      .cphrase {
+        fill: var(--paper);
+        font: 700 15px/1 var(--mono);
+      }
+
+      .readout {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+      }
+      .num {
+        font-family: var(--disp);
+        font-weight: 800;
+        font-size: clamp(24px, 3vw, 36px);
+        color: var(--rc);
+        line-height: 0.9;
+        min-width: 2ch;
+      }
+      .rtext .h {
+        font-family: var(--disp);
+        font-weight: 700;
+        font-size: clamp(16px, 1.9vw, 19px);
+        margin: 1px 0 3px;
+        letter-spacing: -0.01em;
+      }
+      .rtext p {
+        margin: 0;
+        color: var(--ink-2);
+        font-size: clamp(13.5px, 1.5vw, 15.5px);
+        max-width: 92ch;
+      }
+      .rtext p b {
+        color: var(--ink);
+        font-weight: 600;
+      }
+      .rtext p code {
+        font-family: var(--mono);
+        font-size: 0.9em;
+        color: var(--ink);
+        background: var(--paper-2);
+        border: 1px solid var(--hair);
+        padding: 1px 5px;
+        border-radius: 5px;
+      }
+
+      .controls {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      .btn {
+        appearance: none;
+        border: 1px solid var(--hair);
+        background: var(--paper-2);
+        color: var(--ink);
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+        transition:
+          transform 0.12s var(--ease),
+          border-color 0.2s;
+      }
+      .btn:hover {
+        border-color: var(--ink-3);
+      }
+      .btn:active {
+        transform: translateY(1px) scale(0.97);
+      }
+      .btn svg {
+        width: 17px;
+        height: 17px;
+        fill: var(--ink);
+      }
+      .btn.play {
+        width: 52px;
+        height: 52px;
+        background: var(--ink);
+        border-color: var(--ink);
+      }
+      .btn.play svg {
+        fill: var(--paper);
+        width: 19px;
+        height: 19px;
+      }
+      .track {
+        flex: 1;
+        height: 6px;
+        border-radius: 999px;
+        background: var(--hair);
+        position: relative;
+        overflow: hidden;
+      }
+      .track > span {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 0;
+        background: var(--rc);
+        border-radius: 999px;
+        transition: width var(--dur) var(--ease);
+      }
+      .count {
+        font: 700 13px/1 var(--mono);
+        color: var(--ink-2);
+        min-width: 52px;
+        text-align: right;
+      }
+
+      @media (max-width: 900px) {
+        body {
+          height: auto;
+          overflow: auto;
+        }
+        .wrap {
+          height: auto;
+        }
+        .panes {
+          grid-template-columns: 1fr;
+        }
+        .term {
+          border-right: none;
+          border-bottom: 1px solid var(--hair);
+        }
+        .side {
+          align-items: flex-start;
+        }
+        .app {
+          min-height: auto;
+        }
+        .swim {
+          min-height: 280px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation-duration: 0.001s !important;
+          transition-duration: 0.001s !important;
+        }
+        .edge {
+          stroke-dashoffset: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <div class="brand">
+          <div class="kicker">Release Workflow</div>
+          <h1>Ship a minor, patch a <em>hotfix</em>.</h1>
+          <p>
+            Two paths to production. Pick a flow and follow the real git
+            commands, branch by branch.
+          </p>
+        </div>
+        <div class="side">
+          <div class="tabs" id="tabs" role="tablist">
+            <button class="tab on" data-flow="normal" role="tab">
+              <span class="d"></span>Normal release
+            </button>
+            <button class="tab" data-flow="hotfix" role="tab">
+              <span class="d"></span>Hotfix
+            </button>
+          </div>
+          <div class="stepper" id="stepper" aria-hidden="true"></div>
+        </div>
+      </header>
+
+      <div class="app">
+        <div class="titlebar">
+          <div class="lights"><i></i><i></i><i></i></div>
+          <div class="name">release — zsh</div>
+          <div class="ctx">
+            <span class="on">on branch</span
+            ><span class="chip main" id="chip">main</span>
+          </div>
+        </div>
+
+        <div class="panes">
+          <div class="term" aria-live="polite">
+            <div class="cwd" id="cwd">~/project · main</div>
+            <div id="lines"></div>
+          </div>
+
+          <div class="graph">
+            <div class="glabel" id="glabel">Normal release pipeline</div>
+            <div class="swim">
+              <!-- ============ NORMAL FLOW ============ -->
+              <svg
+                class="pipe on"
+                data-flow="normal"
+                viewBox="0 -60 680 380"
+                preserveAspectRatio="xMidYMid meet"
+                role="img"
+                aria-label="normal release pipeline"
+              >
+                <g class="band feat">
+                  <rect x="66" y="16" width="600" height="46" rx="12" />
+                </g>
+                <g class="band rc">
+                  <rect x="66" y="94" width="600" height="46" rx="12" />
+                </g>
+                <g class="band rel">
+                  <rect x="66" y="172" width="600" height="46" rx="12" />
+                </g>
+                <g class="band main">
+                  <rect x="66" y="250" width="600" height="46" rx="12" />
+                </g>
+                <text class="lane-label feat" x="12" y="45">feature</text>
+                <text class="lane-label rc" x="12" y="123">rc</text>
+                <text class="lane-label rel" x="12" y="201">release</text>
+                <text class="lane-label main" x="12" y="279">main</text>
+
+                <path
+                  class="edge main show"
+                  data-appear="0"
+                  pathLength="1"
+                  d="M76 273 H132"
+                />
+                <path
+                  class="edge rc"
+                  data-appear="1"
+                  pathLength="1"
+                  d="M100 273 C 150 273, 135 117, 180 117"
+                />
+                <path
+                  class="edge rc"
+                  data-appear="2"
+                  pathLength="1"
+                  d="M180 117 H300"
+                />
+                <path
+                  class="edge feat"
+                  data-appear="2"
+                  pathLength="1"
+                  d="M210 117 C 225 117, 222 39, 245 39"
+                />
+                <path
+                  class="edge feat"
+                  data-appear="2"
+                  pathLength="1"
+                  d="M245 39 C 275 39, 275 117, 300 117"
+                />
+                <path
+                  class="edge rc"
+                  data-appear="3"
+                  pathLength="1"
+                  d="M300 117 H460"
+                />
+                <path
+                  class="edge feat"
+                  data-appear="3"
+                  pathLength="1"
+                  d="M370 117 C 387 117, 383 39, 405 39"
+                />
+                <path
+                  class="edge feat"
+                  data-appear="3"
+                  pathLength="1"
+                  d="M405 39 C 437 39, 437 117, 460 117"
+                />
+                <path
+                  class="edge rel"
+                  data-appear="4"
+                  pathLength="1"
+                  d="M460 117 C 508 117, 497 195, 540 195"
+                />
+                <path
+                  class="edge main"
+                  data-appear="5"
+                  pathLength="1"
+                  d="M100 273 H620"
+                />
+                <path
+                  class="edge rel"
+                  data-appear="5"
+                  pathLength="1"
+                  d="M540 195 C 580 195, 584 273, 620 273"
+                />
+
+                <g class="tok" transform="translate(100,273)">
+                  <circle class="pulse" r="13" />
+                  <circle class="ring" r="14" />
+                  <circle class="core" r="5" />
+                </g>
+
+                <g
+                  class="node main"
+                  data-appear="0"
+                  transform="translate(100,273)"
+                >
+                  <circle r="9" />
+                  <g class="tagpill" transform="translate(-35,-49)">
+                    <rect width="70" height="24" rx="7" />
+                    <text x="10" y="16">v1.0.0</text>
+                  </g>
+                </g>
+                <g
+                  class="node rc"
+                  data-appear="1"
+                  transform="translate(180,117)"
+                >
+                  <circle r="9" />
+                  <g class="refbox rc" transform="translate(-69,-52)">
+                    <rect width="138" height="24" rx="7" />
+                    <text x="10" y="16">rc/v1.1.0-rc.1</text>
+                  </g>
+                  <g class="tagpill" transform="translate(-56,28)">
+                    <rect width="112" height="24" rx="7" />
+                    <text x="10" y="16">v1.1.0-rc.1</text>
+                  </g>
+                </g>
+                <g
+                  class="node feat"
+                  data-appear="2"
+                  transform="translate(245,39)"
+                >
+                  <circle r="8" />
+                  <g class="refbox feat" transform="translate(-73,-34)">
+                    <rect width="146" height="24" rx="7" />
+                    <text x="10" y="16">feature/cart-v2</text>
+                  </g>
+                </g>
+                <g
+                  class="node rc"
+                  data-appear="2"
+                  transform="translate(300,117)"
+                >
+                  <circle r="9" />
+                </g>
+                <g
+                  class="node feat"
+                  data-appear="3"
+                  transform="translate(405,39)"
+                >
+                  <circle r="8" />
+                  <g class="refbox feat" transform="translate(-65,-34)">
+                    <rect width="130" height="24" rx="7" />
+                    <text x="10" y="16">fix/login-500</text>
+                  </g>
+                </g>
+                <g
+                  class="node rc"
+                  data-appear="3"
+                  transform="translate(460,117)"
+                >
+                  <circle r="9" />
+                </g>
+                <g
+                  class="node rel"
+                  data-appear="4"
+                  transform="translate(540,195)"
+                >
+                  <circle r="9" />
+                  <g class="refbox rel" transform="translate(-69,-52)">
+                    <rect width="138" height="24" rx="7" />
+                    <text x="10" y="16">release/v1.1.0</text>
+                  </g>
+                </g>
+                <g
+                  class="node main"
+                  data-appear="5"
+                  transform="translate(620,273)"
+                >
+                  <circle r="9.5" />
+                  <g class="tagpill" transform="translate(-35,-49)">
+                    <rect width="70" height="24" rx="7" />
+                    <text x="10" y="16">v1.1.0</text>
+                  </g>
+                </g>
+
+                <g class="rcdel">
+                  <line class="strike" x1="170" y1="117" x2="470" y2="117" />
+                  <g class="delpill" transform="translate(234,103)">
+                    <rect width="172" height="28" rx="9" />
+                    <text x="86" y="19">rc branch deleted</text>
+                  </g>
+                </g>
+
+                <g class="callout">
+                  <path class="ctail" d="" />
+                  <rect class="cbox" rx="9" />
+                  <circle class="cbadge" />
+                  <text class="cnum"></text>
+                  <text class="cphrase"></text>
+                </g>
+              </svg>
+
+              <!-- ============ HOTFIX FLOW ============ -->
+              <svg
+                class="pipe"
+                data-flow="hotfix"
+                viewBox="0 -60 560 320"
+                preserveAspectRatio="xMidYMid meet"
+                role="img"
+                aria-label="hotfix pipeline"
+              >
+                <g class="band rel">
+                  <rect x="66" y="18" width="470" height="48" rx="12" />
+                </g>
+                <g class="band main">
+                  <rect x="66" y="100" width="470" height="48" rx="12" />
+                </g>
+                <g class="band hot">
+                  <rect x="66" y="182" width="470" height="48" rx="12" />
+                </g>
+                <text class="lane-label rel" x="12" y="48">release</text>
+                <text class="lane-label main" x="12" y="130">main</text>
+                <text class="lane-label hot" x="12" y="212">hotfix</text>
+
+                <path
+                  class="edge main show"
+                  data-appear="0"
+                  pathLength="1"
+                  d="M76 124 H150"
+                />
+                <path
+                  class="edge main"
+                  data-appear="1"
+                  pathLength="1"
+                  d="M110 124 H300"
+                />
+                <path
+                  class="edge hot"
+                  data-appear="1"
+                  pathLength="1"
+                  d="M175 124 C 195 124, 195 206, 215 206"
+                />
+                <path
+                  class="edge hot"
+                  data-appear="1"
+                  pathLength="1"
+                  d="M215 206 C 260 206, 255 124, 300 124"
+                />
+                <path
+                  class="edge main"
+                  data-appear="2"
+                  pathLength="1"
+                  d="M300 124 H510"
+                />
+                <path
+                  class="edge rel"
+                  data-appear="2"
+                  pathLength="1"
+                  d="M300 124 C 345 124, 350 42, 395 42"
+                />
+                <path
+                  class="edge rel"
+                  data-appear="2"
+                  pathLength="1"
+                  d="M395 42 C 445 42, 445 124, 490 124"
+                />
+
+                <g class="tok" transform="translate(110,124)">
+                  <circle class="pulse" r="13" />
+                  <circle class="ring" r="14" />
+                  <circle class="core" r="5" />
+                </g>
+
+                <g
+                  class="node main"
+                  data-appear="0"
+                  transform="translate(110,124)"
+                >
+                  <circle r="9.5" />
+                  <g class="tagpill" transform="translate(-35,-49)">
+                    <rect width="70" height="24" rx="7" />
+                    <text x="10" y="16">v1.1.0</text>
+                  </g>
+                </g>
+                <g
+                  class="node hot"
+                  data-appear="1"
+                  transform="translate(215,206)"
+                >
+                  <circle r="8" />
+                  <g class="refbox hot" transform="translate(-69,-45)">
+                    <rect width="138" height="24" rx="7" />
+                    <text x="10" y="16">hotfix/payment</text>
+                  </g>
+                </g>
+                <g
+                  class="node main"
+                  data-appear="1"
+                  transform="translate(300,124)"
+                >
+                  <circle r="9" />
+                </g>
+                <g
+                  class="node rel"
+                  data-appear="2"
+                  transform="translate(395,42)"
+                >
+                  <circle r="9" />
+                  <g class="refbox rel" transform="translate(-69,-31)">
+                    <rect width="138" height="24" rx="7" />
+                    <text x="10" y="16">release/v1.1.1</text>
+                  </g>
+                </g>
+                <g
+                  class="node main"
+                  data-appear="2"
+                  transform="translate(490,124)"
+                >
+                  <circle r="9.5" />
+                  <g class="tagpill" transform="translate(-35,-49)">
+                    <rect width="70" height="24" rx="7" />
+                    <text x="10" y="16">v1.1.1</text>
+                  </g>
+                </g>
+
+                <g class="callout">
+                  <path class="ctail" d="" />
+                  <rect class="cbox" rx="9" />
+                  <circle class="cbadge" />
+                  <text class="cnum"></text>
+                  <text class="cphrase"></text>
+                </g>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="readout">
+        <div class="num" id="num">01</div>
+        <div class="rtext">
+          <div class="h" id="rh">—</div>
+          <p id="rp"></p>
+        </div>
+      </div>
+
+      <nav class="controls" aria-label="Playback">
+        <button class="btn" id="restart" aria-label="Restart">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 5V2L7 6l5 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z" />
+          </svg>
+        </button>
+        <button class="btn" id="prev" aria-label="Previous">
+          <svg viewBox="0 0 24 24"><path d="M15 5v14l-9-7z" /></svg>
+        </button>
+        <button class="btn play" id="play" aria-label="Play or pause">
+          <svg viewBox="0 0 24 24">
+            <path id="playicon" d="M7 4v16l13-8z" />
+          </svg>
+        </button>
+        <button class="btn" id="next" aria-label="Next">
+          <svg viewBox="0 0 24 24"><path d="M9 5v14l9-7z" /></svg>
+        </button>
+        <div class="track" aria-hidden="true"><span id="fill"></span></div>
+        <div class="count" id="count">1 / 6</div>
+      </nav>
+    </div>
+
+    <script>
+      (() => {
+        const FLOWS = {
+          normal: {
+            label: "Normal release pipeline",
+            steps: [
+              {
+                h: "Starting point",
+                chip: ["main", "main"],
+                cwd: "~/project · main",
+                head: [100, 273],
+                term: [
+                  { k: "cmd", t: "$ git log --oneline -1" },
+                  {
+                    k: "out",
+                    t: "a1b2c3d (HEAD -> main, tag: v1.0.0) chore: release v1.0.0",
+                  },
+                  { k: "mut", t: "# worktree clean · main = origin/main" },
+                ],
+                cap: "<code>main</code> is stable at <b>v1.0.0</b>. Every release command starts from a clean tree on the right branch — the script refuses otherwise.",
+                detail: [
+                  "Switch to <code>main</code> — this is where every release starts.",
+                  "Run <code>git fetch && git pull</code> so local <code>main</code> equals <code>origin/main</code>.",
+                  "Make sure the working tree is clean (<code>git status</code>) — no uncommitted changes.",
+                  "If the tree is dirty or behind, the release script aborts. Fix that first.",
+                ],
+              },
+
+              {
+                h: "Cut the RC branch",
+                chip: ["main", "main"],
+                cwd: "~/project · main",
+                head: [180, 117],
+                term: [
+                  { k: "cmd", t: "$ npm run release:rc:minor" },
+                  { k: "out", t: "Creating RC branch: {b}rc/v1.1.0-rc.1{/b}" },
+                  { k: "out", t: "git switch -c rc/v1.1.0-rc.1" },
+                  {
+                    k: "out",
+                    t: "bump package.json  1.0.0 → {b}1.1.0-rc.1{/b}",
+                  },
+                  {
+                    k: "out",
+                    t: "[rc/v1.1.0-rc.1 f0a1b2c] chore: release v1.1.0-rc.1",
+                  },
+                  {
+                    k: "ok",
+                    t: "pushed branch + tag v1.1.0-rc.1 · deploy to staging  ✓",
+                  },
+                ],
+                cap: "From <code>main</code>, cut the next minor: a new <b>rc/v1.1.0-rc.1</b> branch and tag <b>v1.1.0-rc.1</b>, deployed to staging. This branch is the integration branch for the whole release.",
+                detail: [
+                  "<code>release:rc:minor</code> reads the current version and computes the next <b>minor</b> (1.0.0 → 1.1.0).",
+                  "It creates branch <code>rc/v1.1.0-rc.1</code> from <code>main</code>.",
+                  "Bumps <code>package.json</code> to <code>1.1.0-rc.1</code> and commits it.",
+                  "Tags <code>v1.1.0-rc.1</code>, then pushes the branch and the tag to origin.",
+                  "Deploy the <code>v1.1.0-rc.1</code> tag to the <b>staging</b> environment for QA.",
+                ],
+              },
+
+              {
+                h: "Feature branch → rc",
+                chip: ["rc", "rc/v1.1.0-rc.1"],
+                cwd: "~/project · rc/v1.1.0-rc.1",
+                head: [245, 39],
+                term: [
+                  { k: "cmd", t: "$ git switch rc/v1.1.0-rc.1" },
+                  {
+                    k: "cmd",
+                    t: "$ git switch -c feature/cart-v2   {b}# branch OFF rc{/b}",
+                  },
+                  { k: "mut", t: "# …build the feature, commit as you go…" },
+                  { k: "cmd", t: "$ git push -u origin feature/cart-v2" },
+                  { k: "cmd", t: "$ gh pr create --base rc/v1.1.0-rc.1" },
+                  { k: "ok", t: "PR #181 merged → feature/cart-v2 into rc  ✓" },
+                ],
+                cap: "New work for this release starts as a <b>branch off rc/v1.1.0-rc.1</b>. Open a PR <b>back into the rc branch</b> — never straight into <code>main</code>. The rc branch collects every feature for v1.1.0.",
+                detail: [
+                  "Make sure you're on <code>rc/v1.1.0-rc.1</code>, then branch off it.",
+                  "Create a work branch: <code>git switch -c feature/cart-v2</code>.",
+                  "Build the feature and commit as you go.",
+                  "Push it: <code>git push -u origin feature/cart-v2</code>.",
+                  "Open a PR with <b>base rc/v1.1.0-rc.1</b> — not <code>main</code>.",
+                  "Review and merge. The feature now lives on the rc branch.",
+                ],
+              },
+
+              {
+                h: "Fix staging bugs → rc",
+                chip: ["rc", "rc/v1.1.0-rc.1"],
+                cwd: "~/project · rc/v1.1.0-rc.1",
+                head: [405, 39],
+                term: [
+                  { k: "mut", t: "# staging QA found a bug in v1.1.0-rc.1" },
+                  {
+                    k: "cmd",
+                    t: "$ git switch -c fix/login-500     {b}# branch OFF rc{/b}",
+                  },
+                  { k: "mut", t: "# …commit the fix…" },
+                  { k: "cmd", t: "$ git switch rc/v1.1.0-rc.1" },
+                  {
+                    k: "cmd",
+                    t: "$ git merge fix/login-500         {b}# merge INTO rc{/b}",
+                  },
+                  {
+                    k: "ok",
+                    t: "fix merged · redeploy rc · repeat until green  ✓",
+                  },
+                ],
+                cap: "Bugs found on staging are fixed the same way — a <b>branch off rc</b>, merged <b>back in</b>. No <code>release:rc</code>, no new tag: just redeploy the rc branch and repeat until staging is green.",
+                detail: [
+                  "QA hits a bug on the staging build of <code>v1.1.0-rc.1</code>.",
+                  "Branch <code>fix/login-500</code> off <code>rc</code> and commit the fix.",
+                  "Switch back to <code>rc</code> and merge the fix in (PR or <code>git merge</code>).",
+                  "<b>Do not</b> run <code>release:rc</code> — no new tag is needed for a fix.",
+                  "Redeploy the <code>rc</code> branch to staging and re-test.",
+                  "Repeat feature + fix cycles until staging is fully green.",
+                ],
+              },
+
+              {
+                h: "Promote to stable",
+                chip: ["rc", "rc/v1.1.0-rc.1"],
+                cwd: "~/project · rc/v1.1.0-rc.1",
+                head: [540, 195],
+                term: [
+                  {
+                    k: "cmd",
+                    t: "$ npm run release:rc:promote    {b}# on the rc branch{/b}",
+                  },
+                  { k: "out", t: "git switch -c release/v1.1.0" },
+                  {
+                    k: "out",
+                    t: "bump package.json  1.1.0-rc.1 → {b}1.1.0{/b}",
+                  },
+                  {
+                    k: "out",
+                    t: "[release/v1.1.0 3c4d5e6] chore: release v1.1.0",
+                  },
+                  { k: "ok", t: "PR opened: release/v1.1.0 → main  (#175)  ✓" },
+                ],
+                cap: "Staging is green. Promote the tested rc HEAD into a <b>release/v1.1.0</b> branch and open a PR to <code>main</code>. The rc branch is never merged directly — this PR carries the stable bump.",
+                detail: [
+                  "Run <code>release:rc:promote</code> while on the tested <code>rc</code> branch.",
+                  "It creates <code>release/v1.1.0</code> from the current rc HEAD.",
+                  "Drops the <code>-rc.1</code> suffix: <code>1.1.0-rc.1 → 1.1.0</code>, and commits.",
+                  "Opens a PR from <code>release/v1.1.0</code> into <code>main</code>.",
+                  "The rc branch is never merged straight into main — this PR carries the stable bump.",
+                ],
+              },
+
+              {
+                h: "Merge → tag → clean up",
+                chip: ["main", "main"],
+                cwd: "~/project · main",
+                head: [620, 273],
+                term: [
+                  { k: "warn", t: "» PR #175 merged into main" },
+                  {
+                    k: "out",
+                    t: "tag-after-merge.yml → git tag {b}v1.1.0{/b} → pushed",
+                  },
+                  { k: "out", t: "release.yml → GitHub Release published" },
+                  { k: "out", t: "git push origin --delete rc/v1.1.0-rc.1" },
+                  {
+                    k: "ok",
+                    t: "stable v1.1.0 released · rc branch deleted  ✓",
+                  },
+                ],
+                cap: "Merging the PR triggers automation: it tags stable <b>v1.1.0</b> on <code>main</code>, publishes the GitHub release, and <b>deletes the rc branch</b>. The RC history stays in the <code>-rc</code> tag.",
+                detail: [
+                  "Merge PR <code>#175</code> into <code>main</code>.",
+                  "<code>tag-after-merge.yml</code> fires: it tags <code>v1.1.0</code> on the merge commit.",
+                  "<code>release.yml</code> publishes the GitHub Release and updates the changelog.",
+                  "The now-obsolete <code>rc/v1.1.0-rc.1</code> branch is <b>auto-deleted</b>.",
+                  "The candidate history is preserved forever in the <code>v1.1.0-rc.1</code> tag.",
+                ],
+              },
+            ],
+          },
+
+          hotfix: {
+            label: "Hotfix pipeline",
+            steps: [
+              {
+                h: "Production bug",
+                chip: ["main", "main"],
+                cwd: "~/project · main",
+                head: [110, 124],
+                term: [
+                  { k: "cmd", t: "$ git log --oneline -1" },
+                  {
+                    k: "out",
+                    t: "3c4d5e6 (HEAD -> main, tag: v1.1.0) chore: release v1.1.0",
+                  },
+                  {
+                    k: "warn",
+                    t: "# production bug reported on v1.1.0 — can't wait",
+                  },
+                ],
+                cap: "<code>main</code> is live at <b>v1.1.0</b> and a production bug just came in. It can't wait for the next RC train — take the fast lane.",
+                detail: [
+                  "<code>main</code> is live at the stable tag <code>v1.1.0</code>.",
+                  "A production bug is reported that can't wait for the next RC train.",
+                  "Switch to <code>main</code> and run <code>git pull</code> so it's up to date.",
+                  "Confirm the working tree is clean before branching.",
+                ],
+              },
+
+              {
+                h: "Branch off main & fix",
+                chip: ["main", "main"],
+                cwd: "~/project · main",
+                head: [215, 206],
+                term: [
+                  { k: "cmd", t: "$ git switch main && git pull" },
+                  {
+                    k: "cmd",
+                    t: "$ git switch -c hotfix/payment-timeout  {b}# OFF main{/b}",
+                  },
+                  { k: "mut", t: "# …commit the fix…" },
+                  { k: "cmd", t: "$ gh pr create --base main" },
+                  { k: "ok", t: "PR #190 merged → hotfix into main  ✓" },
+                ],
+                cap: "A production bug branches straight <b>off main</b> as <code>hotfix/*</code>. Get the fix reviewed and merged <b>back into main</b> first — the patch release comes next.",
+                detail: [
+                  "Branch <code>hotfix/payment-timeout</code> straight off <code>main</code>.",
+                  "Commit the <b>minimal, targeted</b> fix — nothing else rides along.",
+                  "Push and open a PR with <b>base main</b>.",
+                  "Review and merge. The fix is now on <code>main</code>.",
+                  "The patch release is a separate step — that comes next.",
+                ],
+              },
+
+              {
+                h: "Ship the patch",
+                chip: ["main", "main"],
+                cwd: "~/project · main",
+                head: [490, 124],
+                term: [
+                  {
+                    k: "cmd",
+                    t: "$ npm run release:patch         {b}# on main{/b}",
+                  },
+                  { k: "out", t: "git switch -c release/v1.1.1" },
+                  { k: "out", t: "bump package.json  1.1.0 → {b}1.1.1{/b}" },
+                  {
+                    k: "out",
+                    t: "[release/v1.1.1 7a8b9c0] chore: release v1.1.1",
+                  },
+                  { k: "ok", t: "PR merged → tag v1.1.1 → published  ✓" },
+                  {
+                    k: "mut",
+                    t: "# no RC train — small, backward-compatible fixes only",
+                  },
+                ],
+                cap: "With the fix on <code>main</code>, cut the patch: <code>release:patch</code> opens <b>release/v1.1.1</b>; merging it tags <b>v1.1.1</b>. The only direct-to-stable path — keep it to safe fixes.",
+                detail: [
+                  "With the fix on <code>main</code>, run <code>release:patch</code>.",
+                  "It creates <code>release/v1.1.1</code> and bumps <code>1.1.0 → 1.1.1</code>.",
+                  "Opens a PR into <code>main</code>; merging it tags <code>v1.1.1</code> and publishes.",
+                  "No RC branch, no staging gate — this is the only direct-to-stable path.",
+                  "Use it only for small, <b>backward-compatible</b> fixes.",
+                ],
+              },
+            ],
+          },
+        };
+
+        const DWELL = 4200; // ms each step holds before advancing
+        // short phrase shown in the traveling callout, per step
+        const LABELS = {
+          normal: [
+            "baseline",
+            "cut RC",
+            "feature → rc",
+            "fix → rc",
+            "promote",
+            "merge → tag",
+          ],
+          hotfix: ["production bug", "hotfix → main", "ship patch"],
+        };
+        let mode = "normal",
+          steps = FLOWS.normal.steps,
+          N = steps.length;
+        let cur = 0,
+          playing = false,
+          timer = null;
+        let parts = [],
+          rcParts = [],
+          tok = null,
+          rcdel = null,
+          dots = [];
+        let cout = null,
+          ctail = null,
+          cbox = null,
+          cbadge = null,
+          cnum = null,
+          cphrase = null,
+          vbw = 680,
+          vbh = 320;
+
+        const $ = (s) => document.querySelector(s);
+        const linesEl = $("#lines"),
+          chip = $("#chip"),
+          cwd = $("#cwd"),
+          glabel = $("#glabel");
+        const num = $("#num"),
+          rh = $("#rh"),
+          rp = $("#rp"),
+          count = $("#count"),
+          fill = $("#fill"),
+          playicon = $("#playicon");
+        const stepper = $("#stepper");
+
+        function bindFlow() {
+          const svg = document.querySelector(".pipe.on");
+          parts = [...svg.querySelectorAll("[data-appear]")];
+          rcParts = [...svg.querySelectorAll(".rc, .feat")];
+          tok = svg.querySelector(".tok");
+          rcdel = svg.querySelector(".rcdel");
+          cout = svg.querySelector(".callout");
+          ctail = cout.querySelector(".ctail");
+          cbox = cout.querySelector(".cbox");
+          cbadge = cout.querySelector(".cbadge");
+          cnum = cout.querySelector(".cnum");
+          cphrase = cout.querySelector(".cphrase");
+          const vb = svg.getAttribute("viewBox").split(/\s+/).map(Number);
+          vbw = vb[2];
+          vbh = vb[3];
+        }
+        function buildStepper() {
+          stepper.replaceChildren();
+          for (let i = 0; i < N; i++) {
+            const d = document.createElement("span");
+            d.className = "sd";
+            stepper.appendChild(d);
+          }
+          dots = [...stepper.children];
+        }
+
+        function termLine(line, i, lastIdx) {
+          const div = document.createElement("div");
+          div.className = "tline " + line.k;
+          div.style.setProperty("--i", i);
+          const segs = line.t.split(/(\{b\}|\{\/b\})/);
+          let bold = false;
+          segs.forEach((seg) => {
+            if (seg === "{b}") {
+              bold = true;
+              return;
+            }
+            if (seg === "{/b}") {
+              bold = false;
+              return;
+            }
+            if (seg === "") return;
+            if (line.k === "cmd" && seg.startsWith("$ ")) {
+              const p = document.createElement("span");
+              p.className = "p";
+              p.textContent = "$";
+              div.append(p, document.createTextNode(seg.slice(1)));
+            } else {
+              const s = document.createElement(bold ? "b" : "span");
+              s.textContent = seg;
+              div.append(s);
+            }
+          });
+          if (i === lastIdx) {
+            const c = document.createElement("span");
+            c.className = "caret";
+            div.append(c);
+          }
+          return div;
+        }
+
+        function parseRich(str) {
+          const out = [];
+          let i = 0;
+          const re = /<(code|b)>(.*?)<\/\1>/g;
+          for (const m of str.matchAll(re)) {
+            if (m.index > i)
+              out.push(document.createTextNode(str.slice(i, m.index)));
+            const el = document.createElement(m[1]);
+            el.textContent = m[2];
+            out.push(el);
+            i = m.index + m[0].length;
+          }
+          if (i < str.length) out.push(document.createTextNode(str.slice(i)));
+          return out;
+        }
+
+        // Move the traveling callout to sit above the active commit in the
+        // reserved top strip, with a leader line pointing down to the node.
+        // The group's x-translate follows the node (CSS transition = glide).
+        const STRIP_TOP = -50,
+          STRIP_H = 34;
+        function positionCallout() {
+          const [hx, hy] = steps[cur].head;
+          const phrase = (LABELS[mode] || [])[cur] || "";
+          const pw = 52 + phrase.length * 8.6; // pill width (mono ~15px)
+          // centre the pill over the node, then clamp it inside the viewBox
+          let lx = -pw / 2;
+          lx = Math.max(10 - hx, Math.min(vbw - 10 - pw - hx, lx));
+
+          cout.setAttribute("transform", `translate(${hx},0)`);
+          cbox.setAttribute("x", lx);
+          cbox.setAttribute("y", STRIP_TOP);
+          cbox.setAttribute("width", pw);
+          cbox.setAttribute("height", STRIP_H);
+          const bcx = lx + 22,
+            bcy = STRIP_TOP + STRIP_H / 2;
+          cbadge.setAttribute("cx", bcx);
+          cbadge.setAttribute("cy", bcy);
+          cbadge.setAttribute("r", 12);
+          cnum.setAttribute("x", bcx);
+          cnum.setAttribute("y", bcy + 5);
+          cnum.textContent = cur + 1;
+          cphrase.setAttribute("x", lx + 42);
+          cphrase.setAttribute("y", bcy + 5);
+          cphrase.textContent = phrase;
+          // leader from the node (local 0,hy) up to the pill's bottom centre
+          ctail.setAttribute(
+            "d",
+            `M0 ${hy} L ${lx + pw / 2} ${STRIP_TOP + STRIP_H}`,
+          );
+        }
+
+        function render() {
+          const s = steps[cur];
+          parts.forEach((p) =>
+            p.classList.toggle("show", +p.dataset.appear <= cur),
+          );
+          const delStep = mode === "normal" ? N - 1 : -1;
+          rcParts.forEach((p) =>
+            p.classList.toggle("gone", delStep >= 0 && cur >= delStep),
+          );
+          if (rcdel)
+            rcdel.classList.toggle("show", delStep >= 0 && cur >= delStep);
+          tok.setAttribute("transform", `translate(${s.head[0]},${s.head[1]})`);
+          positionCallout();
+
+          const last = s.term.length - 1;
+          linesEl.replaceChildren(
+            ...s.term.map((ln, i) => termLine(ln, i, last)),
+          );
+
+          chip.className = "chip " + s.chip[0];
+          chip.textContent = s.chip[1];
+          cwd.textContent = s.cwd;
+
+          num.textContent = String(cur + 1).padStart(2, "0");
+          rh.textContent = s.h;
+          rp.replaceChildren(...parseRich(s.cap));
+
+          count.textContent = `${cur + 1} / ${N}`;
+          fill.style.width = (N === 1 ? 100 : (cur / (N - 1)) * 100) + "%";
+          dots.forEach((d, i) => {
+            d.classList.toggle("cur", i === cur);
+            d.classList.toggle("done", i < cur);
+          });
+        }
+
+        function setMode(m) {
+          if (m === mode) return;
+          mode = m;
+          steps = FLOWS[m].steps;
+          N = steps.length;
+          cur = 0;
+          document
+            .querySelectorAll(".pipe")
+            .forEach((el) => el.classList.toggle("on", el.dataset.flow === m));
+          document
+            .querySelectorAll(".tab")
+            .forEach((el) => el.classList.toggle("on", el.dataset.flow === m));
+          glabel.textContent = FLOWS[m].label;
+          bindFlow();
+          buildStepper();
+          render();
+        }
+
+        function go(i) {
+          cur = (i + N) % N;
+          render();
+        }
+        function next() {
+          if (cur < N - 1) go(cur + 1);
+          else pause();
+        }
+        function prev() {
+          go(cur - 1);
+        }
+        const IP = "M7 4v16l13-8z",
+          IPA = "M6 5h4v14H6zM14 5h4v14h-4z";
+        function play() {
+          playing = true;
+          playicon.setAttribute("d", IPA);
+          clearInterval(timer);
+          timer = setInterval(() => {
+            if (cur >= N - 1) {
+              pause();
+              return;
+            }
+            go(cur + 1);
+          }, DWELL);
+        }
+        function pause() {
+          playing = false;
+          playicon.setAttribute("d", IP);
+          clearInterval(timer);
+        }
+        function toggle() {
+          playing ? pause() : cur >= N - 1 ? (go(0), play()) : play();
+        }
+
+        $("#play").addEventListener("click", toggle);
+        $("#next").addEventListener("click", () => {
+          pause();
+          next();
+        });
+        $("#prev").addEventListener("click", () => {
+          pause();
+          prev();
+        });
+        $("#restart").addEventListener("click", () => {
+          pause();
+          go(0);
+        });
+        document.querySelectorAll(".tab").forEach((t) =>
+          t.addEventListener("click", () => {
+            pause();
+            setMode(t.dataset.flow);
+            play();
+          }),
+        );
+        document.addEventListener("keydown", (e) => {
+          if (e.key === " ") {
+            e.preventDefault();
+            toggle();
+          } else if (e.key === "ArrowRight") {
+            pause();
+            next();
+          } else if (e.key === "ArrowLeft") {
+            pause();
+            prev();
+          }
+        });
+
+        bindFlow();
+        buildStepper();
+        render();
+        setTimeout(() => {
+          if (!playing && cur === 0) play();
+        }, 1200);
+      })();
+    </script>
+  </body>
+</html>

@@ -49,6 +49,18 @@ jobs:
           git push origin "refs/tags/${TAG}:refs/tags/${TAG}"
           echo "tag=${TAG}" >>"$GITHUB_OUTPUT"
 
+      - name: Delete RC branch
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          RC_BRANCH="rc/${TAG}-rc.1"
+          if [ -n "$(git ls-remote --heads origin "refs/heads/${RC_BRANCH}")" ]; then
+            git push origin --delete "${RC_BRANCH}" && echo "Deleted ${RC_BRANCH}" \
+              || echo "Could not delete ${RC_BRANCH} (non-fatal)"
+          else
+            echo "No RC branch ${RC_BRANCH} to delete."
+          fi
+
   publish:
     needs: tag
     uses: ./.github/workflows/release.yml
