@@ -28,6 +28,8 @@ All commands require a clean worktree. Commands run on `main` also require local
 4. From the tested RC branch, run `release:rc:promote`.
 5. Merge the generated `release/vX.Y.Z` PR into `main`. Automation then pushes `vX.Y.Z`, publishes the GitHub release, and deletes the now-obsolete `rc/vX.Y.Z-rc.1` branch (the RC history is preserved in the `-rc.N` tags).
 
+> **Getting your changes into a release:** branch your work off the RC branch and open the PR with **base = the RC branch** (`rc/vX.Y.Z-rc.1`), not `main`. Merge it **before** running `release:rc:promote`. A PR based on `main` will not ride the release — promote only carries what is on the RC branch, and it now **aborts** if the release would contain no real changes (only version bumps). Override a deliberate chore-only promote with `ALLOW_EMPTY_PROMOTE=yes`.
+
 `release:patch` follows the same PR-and-post-merge-tag path without an RC train. `init` is the sole direct stable tag command and refuses to run once any `v*` tag exists.
 
 After a tag is created, `.github/workflows/release.yml` runs two jobs:

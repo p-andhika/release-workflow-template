@@ -182,6 +182,27 @@ validate_release_recovery_ref() {
   fi
 }
 
+# Refuse to promote an rc branch that carries no real changes over the stable
+# branch (only version-bump / changelog commits) — the usual cause is a feature
+# PR that targeted the stable branch instead of this rc branch. Override with
+# ALLOW_EMPTY_PROMOTE=yes for a deliberate chore-only release.
+guard_release_not_empty() {
+  local target_version="$1" source_branch="$2"
+  git fetch --quiet origin "$STABLE_BRANCH" 2>/dev/null || true
+  local base_ref="refs/remotes/origin/${STABLE_BRANCH}"
+  git show-ref --verify --quiet "$base_ref" || base_ref="FETCH_HEAD"
+  local promoted real
+  promoted="$(git log --oneline "${base_ref}..HEAD" 2>/dev/null || true)"
+  real="$(git log --format='%s' "${base_ref}..HEAD" 2>/dev/null | grep -ivE '^(chore: (release|bump version)|docs: update CHANGELOG)' | grep -c . || true)"
+  echo "Commits that will be promoted into release/v${target_version}:"
+  printf '%s\n' "${promoted:-  (none)}" | sed 's/^/  /'
+  if [ "${real:-0}" -eq 0 ] && [ "${ALLOW_EMPTY_PROMOTE:-}" != "yes" ]; then
+    fail "release/v${target_version} would contain NO real changes over '${STABLE_BRANCH}' — only version bumps.
+       Merge your feature/fix PRs INTO this rc branch first (PR base = '${source_branch}'), not '${STABLE_BRANCH}'.
+       If a chore-only promote is intentional, re-run with ALLOW_EMPTY_PROMOTE=yes."
+  fi
+}
+
 create_release_pr_branch() {
   local current_version="$1"
   local target_version="$2"
@@ -344,6 +365,7 @@ rc)
 rc:promote)
   rc_version "$CURRENT_VERSION"
   TARGET_VERSION="${BASH_REMATCH[1]}"
+  guard_release_not_empty "$TARGET_VERSION" "$CURRENT_BRANCH"
   create_release_pr_branch "$CURRENT_VERSION" "$TARGET_VERSION" "$CURRENT_BRANCH"
   ;;
 esac

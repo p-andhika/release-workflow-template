@@ -227,6 +227,25 @@ ok "branch/package base mismatch is rejected"
 assert_contains "$TMP/dirty.log" "working tree and index must be clean" "dirty worktree rejection"
 ok "dirty worktree is rejected before mutation"
 
+# A promote whose rc branch carries only version bumps (no real changes) must abort.
+(
+  cd "$REPO"
+  run_expect_fail "$TMP/empty-promote.log" bash scripts/release.sh rc:promote
+)
+assert_contains "$TMP/empty-promote.log" "would contain NO real changes" "empty promote guard"
+assert_eq "$(git -C "$REPO" branch --show-current)" "rc/v1.1.0-rc.1" "source branch kept after empty-promote abort"
+ok "promote aborts when the rc branch carries no real changes"
+
+# Land a real change on the rc branch (and push it, to satisfy the origin
+# alignment guard) so the remaining promote cases reach gh.
+(
+  cd "$REPO"
+  echo "real change" >feature.txt
+  git add feature.txt
+  git commit -qm "feat: real change to promote"
+  git push -q origin rc/v1.1.0-rc.1
+)
+
 (
   cd "$REPO"
   run_expect_fail "$TMP/promote-fail.log" env PATH="$TMP/bin:$PATH" GH_STUB_STATE="$TMP/pr-hard-fail" GH_STUB_FAIL=true bash scripts/release.sh rc:promote
